@@ -184,9 +184,9 @@ GitHub requires a Personal Access Token (or SSH Key) for Jenkins to clone privat
    - **Version**: Select `NodeJS 20.x` or latest LTS.
 3. **Allure Commandline Configuration**:
    - Scroll down to **Allure Commandline** ➔ Click **Add Allure Commandline**.
-   - **Name**: `allure` (matches the default tool name).
+   - **Name**: `Allure Commandline`.
    - Check **Install automatically**.
-   - **Version**: Select latest version (e.g., `2.32.0`).
+   - **Version policy**: Select `Recommended Allure 2 (2.46.0)`.
 4. Click **Save**.
 
 ---
