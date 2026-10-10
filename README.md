@@ -53,6 +53,129 @@ PLAYWRIGHT_JENKINS_TS/
 
 ---
 
+## 📐 Technical Architecture & Flow
+
+### 1. Framework Architecture & Component Hierarchy
+
+```mermaid
+flowchart TD
+    subgraph CI_CD["CI/CD & Source Control Layer"]
+        DEV["Developer Commit / PR"] --> GITHUB["GitHub Repository (main)"]
+        GITHUB -->|Webhook / Poll| JENKINS["Jenkins Declarative Pipeline (Jenkinsfile)"]
+        JENKINS -->|Parameters: ENV, BROWSER, SUITE, WORKERS| RUNNER["Playwright Test Runner"]
+    end
+
+    subgraph CONFIG_DATA["Configuration & Test Data Layer"]
+        ENV_DEV[".env.dev"]
+        ENV_QA[".env.qa"]
+        ENV_PROD[".env.prod"]
+        ENV_FILES["Environment Files (.env.*)"] --> ENV_CFG["env.config.ts (Typed Config)"]
+        EXCEL_FILE["testdata.xlsx (LoginData / CheckoutData)"] --> EXCEL_UTIL["ExcelUtil.ts (SheetJS)"]
+    end
+
+    subgraph CORE["Core Framework & POM Layer"]
+        BASE_PAGE["BasePage (Waits, Clicks, Logging, Screenshots)"]
+        LOGIN_PAGE["LoginPage"]
+        PROD_PAGE["ProductsPage"]
+        CART_PAGE["CartPage"]
+        CHK_PAGE["CheckoutPage"]
+        COMP_PAGE["CheckoutCompletePage"]
+
+        BASE_PAGE --> LOGIN_PAGE
+        BASE_PAGE --> PROD_PAGE
+        BASE_PAGE --> CART_PAGE
+        BASE_PAGE --> CHK_PAGE
+        BASE_PAGE --> COMP_PAGE
+
+        ALLURE_HELPER["AllureHelper (Epics, Stories, Severity, Attachments)"]
+        LOGGER["Logger (Structured Logs)"]
+    end
+
+    subgraph FIXTURES["Test Fixtures Layer"]
+        TEST_FIXTURE["testFixtures.ts (Custom Fixture Injection & Teardown)"]
+        ENV_CFG --> TEST_FIXTURE
+        LOGIN_PAGE --> TEST_FIXTURE
+        PROD_PAGE --> TEST_FIXTURE
+        CART_PAGE --> TEST_FIXTURE
+        CHK_PAGE --> TEST_FIXTURE
+        COMP_PAGE --> TEST_FIXTURE
+        ALLURE_HELPER --> TEST_FIXTURE
+        LOGGER --> TEST_FIXTURE
+    end
+
+    subgraph TEST_SUITES["Test Suites Layer"]
+        AUTH_SPEC["tests/functional/login.spec.ts"]
+        INV_SPEC["tests/functional/inventory.spec.ts"]
+        E2E_SPEC["tests/e2e/endToEndCheckout.spec.ts"]
+        DDT_LOGIN["tests/ddt/loginExcelDdt.spec.ts"]
+        DDT_CHK["tests/ddt/checkoutExcelDdt.spec.ts"]
+
+        TEST_FIXTURE --> AUTH_SPEC
+        TEST_FIXTURE --> INV_SPEC
+        TEST_FIXTURE --> E2E_SPEC
+        TEST_FIXTURE --> DDT_LOGIN
+        TEST_FIXTURE --> DDT_CHK
+        EXCEL_UTIL --> DDT_LOGIN
+        EXCEL_UTIL --> DDT_CHK
+    end
+
+    subgraph EXECUTION["Execution & Browser Engine"]
+        RUNNER --> TEST_SUITES
+        AUTH_SPEC & INV_SPEC & E2E_SPEC & DDT_LOGIN & DDT_CHK --> BROWSERS["Browsers (Chromium / Firefox / WebKit)"]
+        BROWSERS --> APP["Target App: SauceDemo (https://www.saucedemo.com)"]
+    end
+
+    subgraph REPORTING["Reporting & Test Telemetry"]
+        APP --> RESULTS["Test Results & Artifacts"]
+        RESULTS --> ALLURE_RES["allure-results/"]
+        RESULTS --> PW_REPORT["playwright-report/ (HTML)"]
+        RESULTS --> JUNIT["test-results/junit-results.xml"]
+        RESULTS --> TRACES["Traces, Videos & Screenshots"]
+
+        ALLURE_RES --> ALLURE_DASH["Allure Interactive Dashboard"]
+        PW_REPORT --> PW_DASH["Playwright HTML Report"]
+        JUNIT --> JENKINS_JUNIT["Jenkins JUnit Test Results"]
+        ALLURE_DASH & PW_DASH & JENKINS_JUNIT --> JENKINS_PUB["Jenkins Published Artifacts & Reports"]
+    end
+```
+
+### 2. End-to-End Execution Flow (Sequence)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant Git as GitHub
+    participant Jen as Jenkins CI
+    participant Config as Config & Excel
+    participant PW as Playwright Engine
+    participant Sauce as SauceDemo UI
+    participant Rep as Reports (Allure & HTML)
+
+    Dev->>Git: git push origin main
+    Git->>Jen: Webhook / Build Trigger
+    Note over Jen: Parameters: ENVIRONMENT, BROWSER, TEST_SUITE, WORKERS
+    Jen->>Jen: Stage: Checkout SCM
+    Jen->>Jen: Stage: npm ci & playwright install
+    Jen->>Jen: Stage: Typecheck (tsc --noEmit)
+    Jen->>PW: Stage: Execute Playwright Tests
+    PW->>Config: Load .env.[ENV] & read testdata.xlsx
+    Config-->>PW: Return AppConfig & Test Records
+    loop For each test case
+        PW->>Sauce: Launch Browser & interact via POM
+        Sauce-->>PW: DOM State & Assertions
+        opt On Failure
+            PW->>PW: Capture Screenshot, Trace & Video
+        end
+    end
+    PW->>Rep: Output allure-results/, junit-results.xml & HTML report
+    Jen->>Rep: Generate Allure Report (allure:generate)
+    Jen->>Jen: Publish Allure Report & Playwright HTML Report
+    Jen-->>Dev: Pipeline Status: SUCCESS / UNSTABLE
+```
+
+---
+
 ## 🌟 Key Features
 
 1. **Page Object Model (POM)**:
