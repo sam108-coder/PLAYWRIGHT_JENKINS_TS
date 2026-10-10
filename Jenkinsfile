@@ -121,6 +121,7 @@ pipeline {
             script {
                 try {
                     allure([
+                        commandline: 'Allure Commandline',
                         includeProperties: false,
                         jdk: '',
                         properties: [],
